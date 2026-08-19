@@ -27,6 +27,44 @@ npm run dev
 
 Local D1 and R2 data live under `.wrangler/state`.
 
+## Use the npm client
+
+This repository does not ship a CLI executable. `npx postplan` downloads the published Postplan client from npm and points it at this Worker.
+
+Upload to a local Worker without signing in:
+
+```sh
+npx postplan upload ./plan.html --api-url http://localhost:8787
+```
+
+For a deployed Worker, pass its exact base URL. The client otherwise defaults to `https://postplan.dev`.
+
+```sh
+npx postplan upload ./plan.html \
+  --description "Q3 warehouse migration plan" \
+  --api-url https://plans.example.com
+```
+
+Anonymous uploads work, but they do not appear in your dashboard. Sign in before uploading drafts that should belong to your account:
+
+```sh
+npx postplan auth login --api-url https://plans.example.com
+```
+
+The command opens the Worker's API-key page. Generate a key there, then paste it into the terminal prompt. You can also save an existing key directly:
+
+```sh
+npx postplan auth set <api-key> --api-url https://plans.example.com
+```
+
+Once authenticated, list your drafts with:
+
+```sh
+npx postplan list --api-url https://plans.example.com
+```
+
+Uploading the same local file again creates a new version of its existing draft. Add `--new` to create a separate draft instead. The client stores credentials and local draft mappings in `~/.postplan`.
+
 ## HTTP API
 
 Upload a draft by sending its HTML as JSON. Authentication is optional for uploads:

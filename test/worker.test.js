@@ -186,8 +186,11 @@ describe("Postplan Worker", () => {
     expect(apiKeys.status).toBe(200);
     expect(await apiKeys.text()).toContain("Continue with shoo");
 
-    const removedCliRoute = await SELF.fetch("https://postplan.test/cli/auth");
-    expect(removedCliRoute.status).toBe(404);
+    const clientAuth = await SELF.fetch("https://postplan.test/cli/auth", {
+      redirect: "manual"
+    });
+    expect(clientAuth.status).toBe(302);
+    expect(clientAuth.headers.get("location")).toBe("/settings/api-keys");
   });
 
   it("completes Shoo sign-in and creates a dashboard session", async () => {

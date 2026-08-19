@@ -167,6 +167,8 @@ export function registerWebRoutes(app) {
     );
   });
 
+  app.get("/cli/auth", (c) => c.redirect("/settings/api-keys"));
+
   app.post("/settings/api-keys", requireConfigured, async (c) => {
     const config = getConfig(c.env);
     const session = await readSession(c.req.raw, config.sessionSecret);
