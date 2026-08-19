@@ -1,0 +1,3 @@
+POSTPLAN_BOOTSTRAP_API_KEY=replace-with-a-long-random-token
+POSTPLAN_PUBLIC_BASE_URL=http://localhost:8787
+POSTPLAN_SESSION_SECRET=replace-with-at-least-32-random-bytes
