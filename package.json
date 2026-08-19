@@ -14,9 +14,9 @@
   "scripts": {
     "start": "wrangler dev",
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --config wrangler.production.jsonc",
     "db:migrate": "wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config wrangler.production.jsonc",
     "test": "vitest run",
     "check:bundle": "wrangler deploy --dry-run --outdir /tmp/postplan-worker-build"
   },
