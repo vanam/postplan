@@ -16,7 +16,14 @@ describe("Postplan Worker", () => {
 
     const home = await SELF.fetch("https://postplan.test/");
     expect(home.status).toBe(200);
-    expect(await home.text()).toContain("Postplan");
+    const homeHtml = await home.text();
+    expect(homeHtml).toContain("Postplan");
+    expect(homeHtml).toContain('<link rel="icon" href="/favicon.ico">');
+
+    const favicon = await SELF.fetch("https://postplan.test/favicon.ico");
+    expect(favicon.status).toBe(200);
+    expect(favicon.headers.get("content-type")).toMatch(/^image\//);
+    expect((await favicon.arrayBuffer()).byteLength).toBe(778);
   });
 
   it("uploads and serves exact HTML through path-style URLs", async () => {
@@ -180,7 +187,9 @@ describe("Postplan Worker", () => {
   it("renders browser sign-in when no session is present", async () => {
     const dashboard = await SELF.fetch("https://postplan.test/dashboard");
     expect(dashboard.status).toBe(200);
-    expect(await dashboard.text()).toContain("Continue with shoo");
+    const dashboardHtml = await dashboard.text();
+    expect(dashboardHtml).toContain("Continue with shoo");
+    expect(dashboardHtml).toContain('<link rel="icon" href="/favicon.ico">');
 
     const apiKeys = await SELF.fetch("https://postplan.test/settings/api-keys");
     expect(apiKeys.status).toBe(200);

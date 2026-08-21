@@ -30,6 +30,8 @@ export function createApp() {
     await next();
   });
 
+  app.get("/favicon.ico", (c) => c.env.ASSETS.fetch(c.req.raw));
+
   app.get("/", (c) => {
     const config = getConfig(c.env);
     return c.html(
