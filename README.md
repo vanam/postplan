@@ -2,6 +2,61 @@
 
 Postplan is a Cloudflare Worker for publishing static HTML drafts. The npm package contains only the server implementation; clients use its HTTP API.
 
+## Fork and deploy your own
+
+1. Fork this repository on GitHub, clone the fork, and install its dependencies:
+
+   ```sh
+   git clone https://github.com/<your-account>/postplan.git
+   cd postplan
+   pnpm install
+   ```
+
+2. Create the Cloudflare resources. Keep the resource names shown here because they are shared by the generated Wrangler configuration.
+
+   ```sh
+   pnpm exec wrangler login
+   pnpm exec wrangler d1 create postplan
+   pnpm exec wrangler r2 bucket create postplan-drafts
+   ```
+
+   Save the `database_id` printed by the D1 command.
+
+3. Enable GitHub Actions for the fork if GitHub asks, then open **Settings > Secrets and variables > Actions** and add these repository secrets:
+
+   | Secret | Purpose |
+   | --- | --- |
+   | `CLOUDFLARE_API_TOKEN` | A scoped token that can deploy Workers, edit D1 and R2 resources, and edit Worker routes |
+   | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account that owns the Worker and storage resources |
+   | `POSTPLAN_DOMAIN_PRODUCTION` | The exact custom hostname, such as `plans.example.com` |
+   | `POSTPLAN_D1_DATABASE_ID_PRODUCTION` | The `database_id` returned in step 2 |
+
+4. Push to `master`. The deploy workflow generates `wrangler.production.jsonc`, applies D1 migrations, and deploys the Worker.
+
+5. Set these Worker secrets once in **Workers & Pages > postplan > Settings > Variables and Secrets**:
+
+   - `POSTPLAN_BOOTSTRAP_API_KEY` establishes the first administrative API key.
+   - `POSTPLAN_SESSION_SECRET` signs browser sessions and must contain at least 32 random bytes.
+
+   You can also generate the production config locally and use Wrangler:
+
+   ```sh
+   POSTPLAN_DOMAIN_PRODUCTION=plans.example.com \
+   POSTPLAN_D1_DATABASE_ID_PRODUCTION=<database_id> \
+   node scripts/generate-wrangler-config.js production
+
+   pnpm exec wrangler secret put POSTPLAN_BOOTSTRAP_API_KEY --config wrangler.production.jsonc
+   pnpm exec wrangler secret put POSTPLAN_SESSION_SECRET --config wrangler.production.jsonc
+   ```
+
+6. Check the deployment:
+
+   ```sh
+   curl --fail https://plans.example.com/healthz
+   ```
+
+The repository tracks only `wrangler.jsonc`. It contains the common Worker, assets, R2, cron, and local D1 settings. `scripts/generate-wrangler-config.js` merges the account-specific domain and D1 ID into `wrangler.<environment>.jsonc`; generated configs remain gitignored.
+
 ## Worker services
 
 The server uses two Cloudflare bindings:
@@ -9,20 +64,14 @@ The server uses two Cloudflare bindings:
 - `DB`, a D1 database containing accounts, API keys, draft metadata, audit events, identities, and rate-limit counters.
 - `DRAFTS`, a private R2 bucket containing the exact uploaded HTML bytes.
 
-The checked-in Wrangler configuration uses a placeholder D1 ID. Create the resources, then replace `database_id` in `wrangler.jsonc` with the value printed by Wrangler:
-
-```sh
-npx wrangler login
-npx wrangler d1 create postplan
-npx wrangler r2 bucket create postplan-drafts
-```
+The D1 ID in the checked-in Wrangler configuration is a placeholder used by local development and tests. Do not replace it with an account-specific production ID.
 
 Apply the schema locally and start the Worker:
 
 ```sh
 cp .dev.vars.example .dev.vars
-npm run db:migrate
-npm run dev
+pnpm run db:migrate
+pnpm run dev
 ```
 
 Local D1 and R2 data live under `.wrangler/state`.
@@ -106,9 +155,10 @@ Set these secrets with `wrangler secret put` in production:
 - `POSTPLAN_BOOTSTRAP_API_KEY` enables the initial administrative account. The Worker creates or updates its D1 row when the key is first used.
 - `POSTPLAN_SESSION_SECRET` signs browser sessions and OAuth state. If it is absent, browser authentication routes return `503`; uploads and draft serving continue to work.
 
-Set ordinary variables in the `vars` section of `wrangler.jsonc`:
+The generated production configuration sets `POSTPLAN_PUBLIC_BASE_URL` to `https://<POSTPLAN_DOMAIN_PRODUCTION>`. For local development, set it in `.dev.vars`.
 
-- `POSTPLAN_PUBLIC_BASE_URL` is the deployment's exact base URL, such as `https://plans.example.com`. Wildcards are rejected.
+You can set these optional ordinary variables in the shared `vars` section of `wrangler.jsonc`; the generator preserves them:
+
 - `SHOO_BASE_URL` defaults to `https://shoo.dev`.
 - `MAX_HTML_BYTES` defaults to `524288`.
 - `UPLOAD_BODY_LIMIT` defaults to `2mb`.
@@ -116,33 +166,21 @@ Set ordinary variables in the `vars` section of `wrangler.jsonc`:
 - `UPLOAD_RATE_LIMIT_WINDOW_MS` and `UPLOAD_RATE_LIMIT_MAX` default to `60000` and `30`.
 - `KEY_MINT_RATE_LIMIT_WINDOW_MS` and `KEY_MINT_RATE_LIMIT_MAX` default to `3600000` and `10`.
 
-Example production variables:
-
-```jsonc
-{
-  "vars": {
-    "POSTPLAN_PUBLIC_BASE_URL": "https://plans.example.com"
-  },
-  "routes": [
-    {
-      "pattern": "plans.example.com",
-      "custom_domain": true
-    }
-  ]
-}
-```
-
 Postplan supports one exact hostname per request. It does not route drafts by subdomain.
 
-## Deploy
+## Manual deployment
 
-Apply migrations before deploying code that depends on them:
+Generate an account-specific config, apply migrations, and deploy:
 
 ```sh
-npm run db:migrate:remote
-npx wrangler secret put POSTPLAN_BOOTSTRAP_API_KEY
-npx wrangler secret put POSTPLAN_SESSION_SECRET
-npm run deploy
+POSTPLAN_DOMAIN_PRODUCTION=plans.example.com \
+POSTPLAN_D1_DATABASE_ID_PRODUCTION=<database_id> \
+node scripts/generate-wrangler-config.js production
+
+pnpm run db:migrate:remote
+pnpm run deploy
+pnpm exec wrangler secret put POSTPLAN_BOOTSTRAP_API_KEY --config wrangler.production.jsonc
+pnpm exec wrangler secret put POSTPLAN_SESSION_SECRET --config wrangler.production.jsonc
 ```
 
 Check the deployment:
@@ -192,9 +230,9 @@ The canonical and `/raw` forms return the same HTML bytes. Responses include `X-
 ## Verification
 
 ```sh
-npm test
-npm run check:bundle
-npm pack --dry-run
+pnpm test
+pnpm run check:bundle
+pnpm pack --dry-run
 ```
 
 The test suite runs inside the Cloudflare Workers runtime with isolated D1 and R2 bindings.
