@@ -10,6 +10,7 @@ import { test } from "node:test";
 
 const exec = promisify(execFile);
 const cli = fileURLToPath(new URL("../bin/postplan.js", import.meta.url));
+const { version } = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
 // Run the real executable with isolated state and an HTTP API on loopback.
 async function fixture(t, respond) {
@@ -60,7 +61,7 @@ test("uploads exact HTML and reuses the saved draft unless --new is supplied", a
   assert.equal(first.url, `${apiUrl}/d/draft-one`);
   assert.equal(uploads[0].html, html);
   assert.equal(uploads[0].filename, "plan.html");
-  assert.equal(uploads[0].metadata.cliVersion, "0.0.5");
+  assert.equal(uploads[0].metadata.cliVersion, version);
   assert.equal(uploads[0].draftId, null);
   assert.equal(JSON.parse((await run("upload", "plan.html", "--json")).stdout).action, "updated");
   assert.equal(uploads[1].draftId, "draft-one");

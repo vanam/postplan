@@ -1,0 +1,81 @@
+name: Publish CLI
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'packages/cli/**'
+      - 'packages/html-policy/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-cli
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install npm with trusted publishing support
+        run: npm install --global npm@11
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test CLI and shared validator
+        run: pnpm --filter ./packages/cli --filter ./packages/html-policy test
+
+      - name: Build and pack CLI
+        run: |
+          pnpm --filter ./packages/cli build
+          pnpm --filter ./packages/cli pack --out "$RUNNER_TEMP/postplan-cli.tgz"
+
+      - name: Verify packaged executable
+        run: npx --yes --package "$RUNNER_TEMP/postplan-cli.tgz" postplan --version
+
+      - name: Check whether this version is already published
+        id: release
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs';
+
+          const { name, version } = JSON.parse(readFileSync('packages/cli/package.json', 'utf8'));
+          if (!/^@[^/]+\/postplan$/.test(name)) {
+            throw new Error('Set the CLI package name to @<your-npm-username>/postplan before publishing.');
+          }
+
+          const url = `https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(version)}`;
+          const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+          if (response.status !== 200 && response.status !== 404) {
+            throw new Error(`npm registry returned HTTP ${response.status}`);
+          }
+
+          const publish = response.status === 404;
+          appendFileSync(process.env.GITHUB_OUTPUT, `publish=${publish}\n`);
+          console.log(publish ? `Publishing ${name}@${version}` : `${name}@${version} already exists; skipping publication.`);
+          NODE
+
+      - name: Publish to npm
+        if: steps.release.outputs.publish == 'true'
+        run: npm publish "$RUNNER_TEMP/postplan-cli.tgz" --access public

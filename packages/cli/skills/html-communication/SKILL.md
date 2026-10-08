@@ -5,7 +5,7 @@ metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
   scope: fleet
-  requires: "npx (postplan is run via npx)"
+  requires: "npx (@vanam/postplan is run via npx)"
 ---
 
 # HTML Communication
@@ -53,7 +53,7 @@ with this skill. Upload is required, including in Auto mode. Do not ask for
 separate permission or stop at the local file.
 
 1. Write the HTML file locally.
-2. In this repository, run `pnpm cli upload <file path>`. Outside it, use the published CLI. Upload requires an API key from `POSTPLAN_API_KEY` or saved CLI credentials; stop and request authentication when it is missing. The default server is `https://postplan.martinvana.com`. Never print the key, include it in the HTML, or commit it. Environment variables are inherited by the CLI; `.env` files are not loaded automatically.
+2. In this repository, run `pnpm cli upload <file path>`. Outside it, use `npx @vanam/postplan upload <file path>`. Upload requires an API key from `POSTPLAN_API_KEY` or saved CLI credentials; stop and request authentication when it is missing. The default server is `https://postplan.martinvana.com`. Never print the key, include it in the HTML, or commit it. Environment variables are inherited by the CLI; `.env` files are not loaded automatically.
 3. Report the local path and returned Postplan URL.
 
 Re-upload the same absolute path to update the existing URL. Use

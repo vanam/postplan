@@ -1,9 +1,17 @@
 {
-  "name": "postplan",
-  "version": "0.0.5",
+  "name": "@vanam/postplan",
+  "version": "0.1.0",
   "description": "Static HTML draft publishing for agents.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vanam/postplan.git",
+    "directory": "packages/cli"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist/",
     "skills/",
