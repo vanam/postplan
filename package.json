@@ -1,38 +1,21 @@
 {
-  "name": "postplan",
-  "version": "0.0.4",
-  "description": "A Cloudflare Worker for publishing static HTML drafts.",
+  "name": "postplan-workspace",
+  "private": true,
   "type": "module",
   "license": "MIT",
-  "files": [
-    ".dev.vars.example",
-    "migrations/",
-    "src/",
-    "README.md",
-    "wrangler.jsonc"
-  ],
+  "packageManager": "pnpm@10.34.6",
   "scripts": {
-    "start": "wrangler dev",
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy --config wrangler.production.jsonc",
-    "db:migrate": "wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config wrangler.production.jsonc",
-    "test": "vitest run",
-    "check:bundle": "wrangler deploy --dry-run --outdir /tmp/postplan-worker-build"
+    "start": "pnpm --filter @postplan/server start",
+    "dev": "pnpm --filter @postplan/server dev",
+    "cli": "node packages/cli/bin/postplan.js",
+    "config:generate": "pnpm --filter @postplan/server config:generate",
+    "deploy": "pnpm --filter @postplan/server deploy",
+    "db:migrate": "pnpm --filter @postplan/server db:migrate",
+    "db:migrate:remote": "pnpm --filter @postplan/server db:migrate:remote",
+    "test": "pnpm -r test",
+    "check:bundle": "pnpm --filter @postplan/server check:bundle"
   },
   "engines": {
     "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
-  },
-  "dependencies": {
-    "hono": "^4.13.13",
-    "jose": "^6.2.12",
-    "nanoid": "^6.0.2",
-    "parse5": "^8.0.1"
-  },
-  "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.3.7",
-    "jsonc-parser": "^3.3.1",
-    "vitest": "^4.1.11",
-    "wrangler": "^4.148.0"
   }
 }

@@ -32,7 +32,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Wrangler config
-        run: node scripts/generate-wrangler-config.js production
+        run: pnpm run config:generate production
         env:
           POSTPLAN_DOMAIN_PRODUCTION: ${{ secrets.POSTPLAN_DOMAIN_PRODUCTION }}
           POSTPLAN_D1_DATABASE_ID_PRODUCTION: ${{ secrets.POSTPLAN_D1_DATABASE_ID_PRODUCTION }}

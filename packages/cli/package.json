@@ -1,0 +1,21 @@
+{
+  "name": "postplan",
+  "version": "0.0.5",
+  "description": "Static HTML draft publishing for agents.",
+  "type": "module",
+  "license": "MIT",
+  "files": ["bin/", "src/", "skills/", "README.md"],
+  "bin": {
+    "postplan": "./bin/postplan.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "parse5": "^7.3.0"
+  }
+}
