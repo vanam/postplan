@@ -9,7 +9,7 @@
     "dev": "pnpm --filter @postplan/server dev",
     "cli": "node packages/cli/bin/postplan.js",
     "config:generate": "pnpm --filter @postplan/server config:generate",
-    "deploy": "pnpm --filter @postplan/server deploy",
+    "deploy": "pnpm --filter @postplan/server run deploy",
     "db:migrate": "pnpm --filter @postplan/server db:migrate",
     "db:migrate:remote": "pnpm --filter @postplan/server db:migrate:remote",
     "test": "pnpm -r test",
