@@ -9,6 +9,7 @@ export default defineConfig({
       main: "./src/worker.js",
       wrangler: { configPath: "./wrangler.jsonc" },
       miniflare: {
+        d1Databases: ["LEGACY_DB"],
         bindings: {
           TEST_MIGRATIONS: JSON.stringify(migrations),
           POSTPLAN_BOOTSTRAP_API_KEY: "test-bootstrap-key",

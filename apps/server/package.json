@@ -29,7 +29,7 @@
     "hono": "^4.13.13",
     "jose": "^6.2.12",
     "nanoid": "^6.0.2",
-    "parse5": "^8.0.1"
+    "@postplan/html-policy": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.3.7",

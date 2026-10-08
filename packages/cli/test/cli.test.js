@@ -111,3 +111,43 @@ test("reports a rejected upload without saving a draft mapping", async (t) => {
   });
   await assert.rejects(readdir(path.join(home, ".postplan", "drafts")), { code: "ENOENT" });
 });
+
+test("checks markup locally without a key and never reports publication readiness", async (t) => {
+  const { home, run } = await fixture(t, () => {
+    assert.fail("A check without credentials must stay local");
+  });
+  await writeFile(path.join(home, "plan.html"), "<title>Plan</title>");
+  await assert.rejects(run("check", "plan.html", "--json"), error => {
+    assert.equal(error.code, 1);
+    const report = JSON.parse(error.stdout);
+    assert.equal(report.ok, false);
+    assert.equal(report.offline, true);
+    assert.equal(report.markupOk, true);
+    assert.match(report.authenticationError, /Missing API key/);
+    assert.equal(report.pages[0].path, "index.html");
+    return true;
+  });
+});
+
+test("reports authenticated readiness and treats a rejected key as an online auth failure", async (t) => {
+  let accepted = true;
+  const { run } = await fixture(t, request => {
+    assert.equal(request.url, "/api/check");
+    assert.equal(request.headers.authorization, "Bearer test-key");
+    return accepted ? { body: { ok: true, account: { name: "Test", apiKeyName: "Test key" },
+      flags: [], limits: { maxBytes: 524288, maxPages: 20 }, capabilities: { inlineScripts: true, customUrls: true } } }
+      : { status: 401, body: { error: "Missing or invalid API key." } };
+  });
+  await run("auth", "set", "test-key");
+  const output = (await run("check")).stdout;
+  assert.match(output, /Account: Test/);
+  assert.match(output, /Ready\./);
+  accepted = false;
+  await assert.rejects(run("check", "--json"), error => {
+    const report = JSON.parse(error.stdout);
+    assert.equal(report.offline, false);
+    assert.equal(report.status, 401);
+    assert.deepEqual(report.errors, ["Missing or invalid API key."]);
+    return true;
+  });
+});

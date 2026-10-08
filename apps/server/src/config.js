@@ -11,6 +11,7 @@ export function getConfig(env = {}) {
     bootstrapApiKey: cleanString(env.POSTPLAN_BOOTSTRAP_API_KEY),
     publicBaseUrl,
     maxHtmlBytes: positiveNumber(env.MAX_HTML_BYTES, DEFAULT_MAX_HTML_BYTES),
+    maxPages: Math.max(1, Math.floor(positiveNumber(env.MAX_UPLOAD_PAGES, 20))),
     uploadBodyBytes: parseByteLimit(env.UPLOAD_BODY_LIMIT, DEFAULT_UPLOAD_BODY_BYTES),
     sessionSecret: cleanString(env.POSTPLAN_SESSION_SECRET),
     shooBaseUrl: normalizeBaseUrl(env.SHOO_BASE_URL || "https://shoo.dev"),
@@ -25,6 +26,10 @@ export function getConfig(env = {}) {
     keyMintRateLimit: {
       windowMs: positiveNumber(env.KEY_MINT_RATE_LIMIT_WINDOW_MS, 3_600_000),
       max: positiveNumber(env.KEY_MINT_RATE_LIMIT_MAX, 10)
+    },
+    checkRateLimit: {
+      windowMs: positiveNumber(env.CHECK_RATE_LIMIT_WINDOW_MS, 60_000),
+      max: positiveNumber(env.CHECK_RATE_LIMIT_MAX, 60)
     }
   };
 }

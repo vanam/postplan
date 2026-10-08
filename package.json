@@ -13,6 +13,8 @@
     "db:migrate": "pnpm --filter @postplan/server db:migrate",
     "db:migrate:remote": "pnpm --filter @postplan/server db:migrate:remote",
     "test": "pnpm -r test",
+    "test:integration": "node scripts/verify-local.js",
+    "pack:cli": "pnpm --filter postplan build && pnpm --filter postplan pack --out postplan-cli.tgz",
     "check:bundle": "pnpm --filter @postplan/server check:bundle"
   },
   "engines": {

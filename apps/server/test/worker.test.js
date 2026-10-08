@@ -145,7 +145,7 @@ describe("Postplan Worker", () => {
       filename: "bad.html"
     });
     expect(invalidHtml.response.status).toBe(422);
-    expect(invalidHtml.body.errors).toContain("External script sources are not allowed.");
+    expect(invalidHtml.body.issues).toContainEqual(expect.objectContaining({ code: "external-script" }));
 
     const invalidJson = await SELF.fetch("https://postplan.test/api/uploads", {
       method: "POST",

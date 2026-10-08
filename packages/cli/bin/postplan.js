@@ -8,8 +8,7 @@ import path from "node:path";
 import { Command } from "commander";
 import { formatBytes, formatIssue, validateUpload } from "../src/html-policy.js";
 
-// Single source of truth for the version: package.json. CI bumps it on every
-// merge to main, so a hardcoded copy here would immediately drift.
+// Keep the executable and publication metadata aligned with the package version.
 const { version: VERSION } = createRequire(import.meta.url)("../package.json");
 const DEFAULT_API_URL = "https://postplan.martinvana.com";
 const POSTPLAN_DIR = path.join(os.homedir(), ".postplan");
@@ -216,18 +215,24 @@ program
     const source = target ? readUploadSource(target) : null;
 
     let report;
-    try {
-      const { ok, status, body } = await requestJson(`${apiUrl}/api/check`, {
-        apiKey,
-        body: { ...source?.body, slug: options.slug },
-        timeoutMs: 60_000
-      });
-      report = ok
-        ? { ...body, offline: false }
-        : { ok: false, offline: false, status, errors: body.errors || [body.error] };
-    } catch (error) {
-      if (!(error instanceof NetworkError)) throw error;
-      report = offlineReport(source, error);
+    if (!apiKey) {
+      report = offlineReport(source, new CliError("Missing API key. Run: postplan auth login"));
+      report.authenticationError = report.networkError;
+      delete report.networkError;
+    } else {
+      try {
+        const { ok, status, body } = await requestJson(`${apiUrl}/api/check`, {
+          apiKey,
+          body: { ...source?.body, slug: options.slug },
+          timeoutMs: 60_000
+        });
+        report = ok
+          ? { ...body, offline: false }
+          : { ok: false, offline: false, status, errors: body.errors?.length ? body.errors : [body.error || "Check failed."] };
+      } catch (error) {
+        if (!(error instanceof NetworkError)) throw error;
+        report = offlineReport(source, error);
+      }
     }
 
     report = { cliVersion: VERSION, apiUrl, path: source?.resolved || null, ...report };
@@ -516,8 +521,8 @@ function printReceipt(receipt) {
 function printCheckReport(report) {
   console.log(`postplan ${report.cliVersion} -> ${report.apiUrl}`);
   if (report.offline) {
-    console.log(`Offline: ${report.networkError}`);
-    console.log("Checked markup locally. Account, limits, and script permission were not checked.");
+    console.log(`Offline: ${report.authenticationError || report.networkError}`);
+    console.log(`${report.path ? "Checked markup locally. " : ""}Account, limits, and script permission were not checked.`);
   } else if (report.limits) {
     const account = report.account
       ? `${report.account.name} (key: ${report.account.apiKeyName})`
@@ -525,7 +530,7 @@ function printCheckReport(report) {
     console.log(`Account: ${account}`);
     console.log(`Flags: ${report.flags.length ? report.flags.join(", ") : "none"}`);
     console.log(`Limit: ${formatBytes(report.limits.maxBytes)} per upload, ${report.limits.maxPages} page(s)`);
-    console.log(`Inline JavaScript: ${report.capabilities.inlineScripts ? "allowed (sandboxed)" : "needs `postplan auth login`"}`);
+    console.log(`Inline JavaScript: ${report.capabilities.inlineScripts ? "allowed (sandboxed)" : "not enabled"}`);
     console.log(`Custom URLs: ${report.capabilities.customUrls ? "enabled" : "not enabled"}`);
   }
   if (report.slug) {

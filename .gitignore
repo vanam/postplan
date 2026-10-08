@@ -4,3 +4,4 @@ node_modules/
 wrangler.*.jsonc
 npm-debug.log*
 postplan-cli.tgz
+dist/

@@ -1,6 +1,6 @@
 # Postplan
 
-Postplan is a Cloudflare Worker for publishing static HTML drafts. This pnpm monorepo contains the Cloudflare server in `apps/server` and the publishable `postplan` CLI in `packages/cli`.
+Postplan is a Cloudflare Worker for publishing HTML drafts. This pnpm monorepo contains the Cloudflare server in `apps/server`, the publishable `postplan` CLI in `packages/cli`, and their shared validator in `packages/html-policy`.
 
 ## Fork and deploy your own
 
@@ -86,7 +86,7 @@ pnpm cli auth set <api-key> --api-url http://localhost:8787
 pnpm cli upload ./plan.html --api-url http://localhost:8787
 ```
 
-The copied client also exposes folder uploads, custom slugs, and online readiness checks. Those features require a newer server API and are not implemented by this Worker. Single-file uploads, authentication, and draft listing work with this server. See [the CLI README](packages/cli/README.md) for packaging and source details.
+The Worker supports single-page and folder uploads, path-based custom slugs, readiness checks, and sandboxed classic inline scripts. Use the repository CLI until this copy is published. See [the CLI README](packages/cli/README.md) for packaging and source details.
 
 Authenticate with the local Worker before uploading:
 
@@ -121,7 +121,15 @@ Once authenticated, list your drafts with:
 npx postplan list --api-url https://plans.example.com
 ```
 
-Uploading the same local file again creates a new version of its existing draft. Add `--new` to create a separate draft instead. The client stores credentials and local draft mappings in `~/.postplan`.
+Uploading the same local file or folder again updates its existing draft. Identical content and script permission return the current version as unchanged; changed content creates a new version. Add `--new` to create a separate draft instead. The client stores credentials and local draft mappings in `~/.postplan`.
+
+```sh
+pnpm cli check ./site --slug warehouse-plan
+pnpm cli upload ./site --slug warehouse-plan --json
+pnpm cli upload ./site --draft <draft-id> --slug renamed-plan
+```
+
+Folders require `index.html` and contain HTML pages only. Relative page links work, including nested paths; images must already use HTTPS or data URLs. Slugs use `/s/<slug>/` on the same hostname.
 
 ## HTTP API
 
@@ -136,7 +144,7 @@ jq -n --rawfile html ./plan.html \
       --data-binary @-
 ```
 
-Requests with a missing, invalid, or revoked API key return `401`. Supply the returned `draftId` in a later upload to create a new version of the same draft:
+Requests with a missing, invalid, or revoked API key return `401`. Supply the returned `draftId` in a later upload to update the same draft:
 
 ```json
 {
@@ -150,6 +158,7 @@ Requests with a missing, invalid, or revoked API key return `401`. Supply the re
 Authenticated endpoints use the same bearer header:
 
 - `POST /api/uploads`
+- `POST /api/check`
 - `GET /api/me`
 - `GET /api/drafts`
 - `POST /api/api-keys`
@@ -158,6 +167,14 @@ Authenticated endpoints use the same bearer header:
 - `POST /api/drafts/:draftId/disable`
 
 Set `POSTPLAN_BOOTSTRAP_API_KEY` to establish the first administrative API key. A signed-in user can also create and revoke keys at `/settings/api-keys`.
+
+For folders, supply `files: [{path: "index.html", html: "..."}, ...]` instead of `html`. Paths must be unique relative `.html` paths; traversal, absolute paths, and reserved top-level names are rejected. An optional `slug` creates or updates an owned draft. Passing both `draftId` and `slug` renames that draft. Slug conflicts return `409`.
+
+Upload receipts include `created`, `unchanged`, `draftId`, `slug`, `versionId`, `versionNumber`, `publicUrl`, `rawUrl`, `versionUrl`, `contentHash`, `totalBytes`, `account`, `pages`, and `warnings`. A folder hash includes its sorted paths and page hashes. Identical uploads do not allocate another version; description or slug changes still apply and are audited. Changing a stored version's script permission requires a new version.
+
+`POST /api/check` accepts the same HTML or page collection and an optional slug, without publishing. An empty object checks readiness only. It returns `ok`, `account`, `flags`, `limits`, `capabilities`, `slug`, `issues`, `errors`, and `warnings`, plus `pages` and `totalBytes` when content is provided. Validation failures return HTTP 200 with `ok: false`; malformed input, authentication, body limits, and rate limits retain their error statuses. Slug statuses are `available`, `owned`, `taken`, `disabled`, or `invalid`; availability is advisory until upload commits.
+
+The CLI can check markup locally without credentials or when the server is unreachable. Such reports are marked `offline: true` and `ok: false`: they do not verify account limits, script permission, or slug availability. An invalid key is an online authentication failure and never falls back to anonymous publishing.
 
 ## Configuration
 
@@ -171,11 +188,13 @@ The generated production configuration sets `POSTPLAN_PUBLIC_BASE_URL` to `https
 You can set these optional ordinary variables in the shared `vars` section of `apps/server/wrangler.jsonc`; the generator preserves them:
 
 - `SHOO_BASE_URL` defaults to `https://shoo.dev`.
-- `MAX_HTML_BYTES` defaults to `524288`.
+- `MAX_HTML_BYTES` defaults to `524288` across all pages in one upload.
+- `MAX_UPLOAD_PAGES` defaults to `20`.
 - `UPLOAD_BODY_LIMIT` defaults to `2mb`.
 - `UPLOAD_IP_RATE_LIMIT_WINDOW_MS` and `UPLOAD_IP_RATE_LIMIT_MAX` default to `60000` and `60`.
 - `UPLOAD_RATE_LIMIT_WINDOW_MS` and `UPLOAD_RATE_LIMIT_MAX` default to `60000` and `30`.
 - `KEY_MINT_RATE_LIMIT_WINDOW_MS` and `KEY_MINT_RATE_LIMIT_MAX` default to `3600000` and `10`.
+- `CHECK_RATE_LIMIT_WINDOW_MS` and `CHECK_RATE_LIMIT_MAX` default to `60000` and `60`. Checks use a separate quota.
 
 Postplan supports one exact hostname per request. It does not route drafts by subdomain.
 
@@ -218,7 +237,7 @@ Each draft version records the Cloudflare client IP and `CF-Ray` request ID, cli
 
 ## HTML policy
 
-Postplan permits inline classic JavaScript at upload time, but the serving CSP prevents scripts from running in a browser. The validator rejects:
+New authenticated versions may execute classic inline JavaScript in an opaque-origin CSP sandbox. Older versions remain script-blocked until reuploaded as a new version. JSON data blocks are inert and do not enable scripts. The validator rejects:
 
 - External or module scripts.
 - Inline event-handler attributes and JavaScript URLs.
@@ -226,7 +245,7 @@ Postplan permits inline classic JavaScript at upload time, but the serving CSP p
 - Meta refresh redirects and unsafe inline CSS constructs.
 - Documents larger than the configured byte or nesting limits.
 
-Draft responses use `script-src 'none'`, `connect-src 'none'`, and `form-action 'none'`. The Worker serves the stored R2 body without rewriting it.
+Scripted versions use `sandbox allow-scripts` without `allow-same-origin`, with `script-src 'unsafe-inline'` and `script-src-attr 'none'`. Other versions use `sandbox` and `script-src 'none'`. All versions block network requests, workers, frames, forms, and base overrides. Sandbox restrictions also block storage, cookies, popups, and top navigation from an embedded draft. External HTTPS images and data images remain allowed. The Worker serves the stored R2 body without rewriting it.
 
 ## Draft URLs
 
@@ -236,6 +255,13 @@ Every draft uses path-style URLs:
 - `/d/<draft-id>/raw`
 - `/d/<draft-id>/v/<number>`
 - `/d/<draft-id>/v/<number>/raw`
+- `/d/<draft-id>/guide/setup.html`
+- `/d/<draft-id>/raw/guide/setup.html`
+- `/d/<draft-id>/v/<number>/guide/setup.html`
+- `/d/<draft-id>/v/<number>/raw/guide/setup.html`
+- `/s/<slug>/` redirects to the stable draft route
+
+Multi-page index URLs end in `/` so relative links resolve within the draft. Historical links stay within the selected version. Missing pages return 404. Top-level `raw` and `v` page names are reserved. Slugs use 1 to 63 lowercase letters, digits, and internal hyphens. Deleted drafts release slugs; disabled drafts reserve them.
 
 The canonical and `/raw` forms return the same HTML bytes. Responses include `X-Postplan-Draft-Id` and `X-Postplan-Draft-Version`.
 
@@ -243,8 +269,9 @@ The canonical and `/raw` forms return the same HTML bytes. Responses include `X-
 
 ```sh
 pnpm test
+pnpm test:integration
 pnpm run check:bundle
-pnpm --filter postplan pack --out postplan-cli.tgz
+pnpm pack:cli
 ```
 
-The server tests run inside the Cloudflare Workers runtime with isolated D1 and R2 bindings. CLI tests run in Node with temporary credentials and a local HTTP server. Root scripts forward server commands to `apps/server`; `pnpm test` runs both workspaces.
+The server tests run inside the Cloudflare Workers runtime with isolated D1 and R2 bindings. CLI tests run in Node with temporary credentials and a local HTTP server. Root scripts forward server commands to `apps/server`; `pnpm test` runs all three workspaces. `pnpm test:integration` uses disposable local D1/R2 state and test credentials on port 8897. `pnpm pack:cli` explicitly builds the CLI before packing, including when lifecycle scripts are disabled. The validator is bundled, so npm consumers do not need another workspace package.

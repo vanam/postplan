@@ -5,11 +5,12 @@ export async function listAccountDrafts(db, accountId, { publicBaseUrl, requestB
     .prepare(
       `
         SELECT
-          d.id, d.title, d.description, d.repo_org, d.repo_name, d.repo_host,
+          d.id, d.title, d.description, d.slug, d.repo_org, d.repo_name, d.repo_host,
           d.created_at, d.updated_at, d.disabled_at,
           cv.version_number AS latest_version_number,
           cv.created_at AS latest_version_at,
-          COALESCE(vc.version_count, 0) AS version_count
+          COALESCE(vc.version_count, 0) AS version_count,
+          (SELECT COUNT(*) FROM draft_version_pages WHERE version_id = d.current_version_id) AS page_count
         FROM drafts d
         LEFT JOIN draft_versions cv ON cv.id = d.current_version_id
         LEFT JOIN (
@@ -28,6 +29,8 @@ export async function listAccountDrafts(db, accountId, { publicBaseUrl, requestB
     draftId: row.id,
     title: row.title,
     description: row.description,
+    slug: row.slug,
+    pageCount: Number(row.page_count),
     repoOrg: row.repo_org,
     repoName: row.repo_name,
     repoHost: row.repo_host,
@@ -40,6 +43,8 @@ export async function listAccountDrafts(db, accountId, { publicBaseUrl, requestB
     disabled: Boolean(row.disabled_at),
     publicUrl: getDraftPublicUrl({
       draftId: row.id,
+      slug: row.slug,
+      multiPage: Number(row.page_count) > 1,
       publicBaseUrl,
       requestBaseUrl
     }),
@@ -89,6 +94,7 @@ export async function getAccountDraftWithVersions(
       description: draft.description,
       publicUrl: getDraftPublicUrl({
         draftId: draft.id,
+        slug: draft.slug,
         publicBaseUrl,
         requestBaseUrl
       })

@@ -7,12 +7,13 @@ export function getHomeUrl({ publicBaseUrl, requestBaseUrl }) {
   return normalizeUrl(publicBaseUrl) || normalizeUrl(requestBaseUrl);
 }
 
-export function getDraftPublicUrl({ draftId, publicBaseUrl, requestBaseUrl }) {
-  return `${getHomeUrl({ publicBaseUrl, requestBaseUrl })}/d/${draftId}`;
+export function getDraftPublicUrl({ draftId, slug, multiPage = false, publicBaseUrl, requestBaseUrl }) {
+  const base = getHomeUrl({ publicBaseUrl, requestBaseUrl });
+  return slug ? `${base}/s/${slug}/` : `${base}/d/${draftId}${multiPage ? "/" : ""}`;
 }
 
 export function getDraftRawUrl({ draftId, publicBaseUrl, requestBaseUrl }) {
-  return `${getDraftPublicUrl({ draftId, publicBaseUrl, requestBaseUrl })}/raw`;
+  return `${getHomeUrl({ publicBaseUrl, requestBaseUrl })}/d/${draftId}/raw`;
 }
 
 function normalizeUrl(value) {

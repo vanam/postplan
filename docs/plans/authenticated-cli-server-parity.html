@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Postplan: missing features implementation plan V2</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#000;color:#fff;font:16px/1.55 system-ui,sans-serif}main{max-width:980px;margin:auto;padding:32px 24px 64px}h1{font-size:29px;line-height:1.2;margin:0 0 16px}h2{font-size:20px;margin:32px 0 10px}h3{font-size:17px;margin:20px 0 6px}p{margin:10px 0}ul,ol{padding-left:24px;margin:10px 0}li{margin:6px 0}code{font:14px ui-monospace,monospace;overflow-wrap:anywhere}pre{background:#151515;padding:14px;overflow:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #333;padding:10px 8px}th{font-weight:650}a{color:#fff;text-underline-offset:3px}.scroll{overflow-x:auto}strong{font-weight:650}@media(max-width:600px){main{padding:24px 16px}h1{font-size:25px}table{min-width:600px}}
+</style>
+</head>
+<body><main>
+<h1>Postplan: missing features implementation plan V2</h1>
+<p><strong>For review. No implementation or deployment is part of this step.</strong></p>
+<p><strong>Revision:</strong> Public uploads have been removed. All publishing requires a valid API key. This plan builds on that change and does not restore anonymous publishing.</p>
+<p>Bring the Cloudflare Worker up to the contract exposed by our copied CLI. Keep D1, R2, existing drafts, and the current hostname. The default endpoint remains <code>https://postplan.martinvana.com</code>. Bundled skills continue to come from Martin's local skill directory.</p>
+
+<h2>What is missing</h2>
+<div class="scroll"><table>
+<thead><tr><th>CLI behavior</th><th>Current Worker</th><th>Planned result</th></tr></thead>
+<tbody>
+<tr><td>Upload a folder</td><td>Accepts only one <code>html</code> string</td><td>Store and serve a version containing multiple HTML pages.</td></tr>
+<tr><td><code>--slug</code></td><td>Silently ignores the slug</td><td>Create, update, or rename an owned draft through a unique slug.</td></tr>
+<tr><td><code>check</code></td><td>No <code>POST /api/check</code></td><td>Report account, limits, capabilities, validation, and slug availability without publishing.</td></tr>
+<tr><td>Publication receipt</td><td>Returns basic URLs and version information</td><td>Return creation status, unchanged status, version URL, hash, total bytes, account, and page manifest.</td></tr>
+<tr><td>Repeat identical upload</td><td>Always allocates another version</td><td>Return the current version as unchanged when content matches.</td></tr>
+<tr><td>Authenticated interactivity</td><td>Accepts classic inline scripts but blocks execution</td><td>Allow scripts for new authenticated versions in an isolated sandbox, if approved below.</td></tr>
+<tr><td>Useful validation diagnostics</td><td>Worker and offline CLI use different validators</td><td>Use one markup policy with structured issues and consistent limits.</td></tr>
+</tbody></table></div>
+
+<h2>Choices to approve</h2>
+<ol>
+<li><strong>Path-based slugs.</strong> Use <code>/s/warehouse-plan/</code> on the existing hostname. A slug resolves to the stable draft route. No wildcard DNS, additional Worker routes, or per-draft subdomains.</li>
+<li><strong>Limits for authenticated publishing.</strong> Every upload requires a valid API key, whether it contains one page, a folder, or a slug. Allow up to 20 HTML pages per version. Keep the current 512 KiB aggregate limit and configurable request-body limit; larger account tiers and flags are outside this change.</li>
+<li><strong>Sandboxed inline scripts.</strong> New versions may execute classic inline scripts with a CSP sandbox that does not grant same-origin access, storage, forms, popups, or top navigation. External scripts, modules, event-handler attributes, and network requests remain blocked. Existing versions retain their current script-blocked behavior. A permission change requires a new version even when HTML bytes match.</li>
+</ol>
+<p>If you prefer to defer scripts, the rest can ship with <code>capabilities.inlineScripts: false</code> and an explicit warning that interactive content will not execute. That would be partial CLI parity, documented as such.</p>
+
+<h2>Data model and publication</h2>
+<ul>
+<li>Build on the existing public-upload removal migration. Preserve surviving account-owned drafts and versions. Do not recreate the removed public account or restore drafts deleted by that migration; cleanup of their leftover R2 objects is outside this feature work.</li>
+<li>Add an additive migration with a nullable unique slug on drafts and a <code>draft_version_pages</code> table keyed by version and page path. Each row records its R2 object key, byte count, content hash, title, and script metadata.</li>
+<li>Preserve the existing version row as the upload-level record. Its hash and size represent the entire upload. Keep its existing object key for the index page so old versions need no R2 rewrite.</li>
+<li>Backfill old versions as one <code>index.html</code> page using existing metadata. Add an explicit per-version script permission defaulting to false so old HTML does not gain execution rights.</li>
+<li>Normalize single-file uploads to <code>index.html</code>. Folder uploads require that page and accept HTML only, including nested paths. Reject duplicate paths, traversal, absolute paths, encoded separators, ambiguous input containing both <code>html</code> and <code>files</code>, and reserved route names.</li>
+<li>Hash single-page content as before. Hash multiple pages using a sorted path/content-hash manifest. Input ordering must not affect the result.</li>
+<li>Validate the entire upload before writing. Put each page in R2, then commit the version, page manifest, draft pointer, slug changes, and audit event in one D1 batch. Clean up newly written objects if R2 or D1 fails; never delete objects belonging to an existing version.</li>
+<li>Use database uniqueness and conditional updates to handle concurrent slug claims, version allocation, and identical uploads. A race must not create two owners for a slug or move the current pointer backwards.</li>
+</ul>
+
+<h2>URLs and navigation</h2>
+<div class="scroll"><table>
+<thead><tr><th>Purpose</th><th>Route</th></tr></thead>
+<tbody>
+<tr><td>Current index page</td><td><code>/d/&lt;id&gt;/</code></td></tr>
+<tr><td>Current named page</td><td><code>/d/&lt;id&gt;/guide/setup.html</code></td></tr>
+<tr><td>Historical page</td><td><code>/d/&lt;id&gt;/v/&lt;n&gt;/guide/setup.html</code></td></tr>
+<tr><td>Raw current page</td><td><code>/d/&lt;id&gt;/raw/guide/setup.html</code></td></tr>
+<tr><td>Raw historical page</td><td><code>/d/&lt;id&gt;/v/&lt;n&gt;/raw/guide/setup.html</code></td></tr>
+<tr><td>Slug alias</td><td><code>/s/&lt;slug&gt;/</code> redirects to the draft route</td></tr>
+</tbody></table></div>
+<p>Keep existing single-page <code>/d/&lt;id&gt;</code>, <code>/raw</code>, and numbered-version URLs working. Return a trailing-slash index URL for new multi-page uploads so relative links resolve correctly. Historical links stay within their selected version. Missing pages return 404; they never fall back to the index. HTML bytes remain unchanged.</p>
+<p>Raw routes return the same HTML bytes with the same security restrictions. Their purpose is retrieval; normal page URLs are used for browsing linked pages. Reserve top-level <code>raw</code> and <code>v</code> paths to prevent route collisions. Root-relative links are diagnosed because they address the service root rather than the draft's folder.</p>
+
+<h2>Slug behavior</h2>
+<ul>
+<li>Use a lowercase slug of 1 to 63 letters, digits, and internal hyphens, starting and ending with a letter or digit. Reject invalid input rather than silently truncating it.</li>
+<li>An unused slug creates a draft. Reusing your own slug updates it. A slug owned by another account returns 409. <code>--draft &lt;id&gt; --slug &lt;name&gt;</code> renames an owned draft; the previous slug becomes available.</li>
+<li>Ownership is checked through the authenticated account, never through knowledge of a URL. Deleted drafts release their slug; disabled drafts reserve theirs and do not serve content.</li>
+<li>Slug availability in <code>check</code> is advisory. Upload rechecks it atomically. Receipts keep the stable draft ID in update commands so later slug reuse cannot retarget an update.</li>
+</ul>
+
+<h2>Check and receipt contracts</h2>
+<p><code>POST /api/check</code> requires a valid API key and accepts an optional single page or page collection and an optional slug. With no file, it reports readiness only. It returns the fields the current CLI reads: <code>ok</code>, <code>account</code>, <code>flags</code>, <code>limits</code>, <code>capabilities</code>, <code>slug</code>, <code>pages</code>, <code>totalBytes</code>, <code>issues</code>, <code>errors</code>, and <code>warnings</code>. The account is always populated in a successful authenticated report.</p>
+<p>A validation failure produces a complete report with <code>ok: false</code>. Missing, invalid, or revoked credentials return 401 before validation. Malformed input, oversized bodies, and rate limiting retain proper HTTP error statuses. Check never writes draft metadata or HTML objects and never consumes upload quota. Reuse bounded validation and a separate check rate limit; normal authentication bookkeeping may still occur.</p>
+<p>Upload responses add <code>created</code>, <code>unchanged</code>, <code>slug</code>, <code>versionUrl</code>, <code>contentHash</code>, <code>totalBytes</code>, <code>account</code>, and <code>pages</code>, while retaining existing response fields. <code>/api/me</code> returns an explicit empty <code>flags</code> array until account flags exist.</p>
+<p>Identical content with the same execution permission returns the current version without another R2 write or version allocation. Requested description or slug changes still apply and receive an audit event. Changed content or execution permission creates a version. Uploads continue to return 401 for missing, invalid, or revoked API keys. Every receipt names the owning account.</p>
+
+<h2>Shared validation and script isolation</h2>
+<p>Extract markup validation and issue formatting into a small shared workspace consumed by both server and CLI. Keep hashing in runtime adapters, using Worker Web Crypto and Node crypto as appropriate. The npm tarball must remain standalone, with no unresolved workspace dependencies.</p>
+<p>Preserve the Worker's existing restrictions unless a rule is deliberately approved here. Add page paths and source positions to diagnostics; distinguish executable scripts from inert JSON data blocks. Offline checking can validate markup, but must not claim to know account permissions, slug ownership, or server limits.</p>
+<p>Keep offline markup checking useful without credentials: when no key is configured, the CLI checks markup locally and returns <code>ok: false</code>, <code>offline: true</code>, and an authentication-required explanation. It never calls that result ready to publish. With a key, it calls the authenticated check endpoint; an unreachable server uses the same local fallback. A 401 is an authentication error, not a network failure. Update both JSON and human output so neither suggests anonymous publishing or a higher anonymous/account tier.</p>
+<p>If scripts are approved, serving selects CSP from the stored version permission. Authenticate before granting that permission. Test the real browser behavior for origin isolation and blocked operations, including the raw route. This is required before calling interactive uploads complete; upload validation alone cannot prove browser isolation.</p>
+
+<h2>Implementation order</h2>
+<ol>
+<li>Define payload, receipt, check, page-path, slug, and permission contracts. Add the shared validator and focused policy tests.</li>
+<li>Add and test the D1 migration against existing single-page data. Implement page manifests, deterministic hashing, atomic version commits, unchanged uploads, and failure cleanup.</li>
+<li>Add page serving and slug resolution. Verify old URLs, relative navigation, historical pages, deletion, disabling, and ownership.</li>
+<li>Add authenticated readiness checks, capability reporting, full receipts, and CLI adjustments for missing credentials, path-based URLs, and accurate offline reporting.</li>
+<li>If approved, add authenticated script permission and CSP sandboxing. Verify isolation in a local browser preview.</li>
+<li>Update API documentation, CLI examples, and relevant bundled skill guidance. Build the standalone npm tarball and verify commands against a disposable local Worker.</li>
+</ol>
+
+<h2>Acceptance checks</h2>
+<ul>
+<li>The existing server and CLI suites pass. A surviving account-owned draft migration fixture still serves its exact original bytes and historical versions. The removed public-upload account stays absent.</li>
+<li>A real CLI folder upload serves index and nested pages; links and version URLs resolve to the expected content. Traversal and conflicting reserved paths are rejected.</li>
+<li>Slug creation, reuse, rename, ownership conflicts, and concurrent claims behave as specified.</li>
+<li>Identical uploads report unchanged and do not allocate extra versions or objects. Concurrent changed uploads preserve unique version numbers and a valid current manifest.</li>
+<li>Failed page writes and failed D1 commits clean up only newly created objects.</li>
+<li><code>check --json</code> and human output work for authenticated users, invalid HTML, oversized folders, and unavailable slugs without publishing. Missing credentials produce a clear local report that does not claim readiness. Direct upload and check requests without a valid key return 401 and create no drafts or R2 objects.</li>
+<li>Offline markup checks agree with online markup checks, while clearly leaving account limits and slug availability unverified. Invalid and revoked keys are never treated as anonymous identities.</li>
+<li>Receipts contain every field consumed by the CLI. The packed npx executable works outside the monorepo.</li>
+<li>If scripts are enabled, browser checks show authenticated interactivity works while forbidden origin, storage, network, form, and navigation operations remain blocked.</li>
+</ul>
+
+<h2>Scope boundaries</h2>
+<p>This is API, persistence, serving, and CLI compatibility work. No dashboard redesign, asset bundling, arbitrary file hosting, wildcard hosting, account billing tiers, or automatic npm publication. Any later non-trivial UI change gets separate static mocks for review.</p>
+<p>Implementation uses isolated local D1 and R2 state. Deployment, remote migrations, live database changes, and npm publication remain separate actions requiring explicit instructions. Your decision on this plan comes first.</p>
+</main></body></html>

@@ -53,11 +53,11 @@ with this skill. Upload is required, including in Auto mode. Do not ask for
 separate permission or stop at the local file.
 
 1. Write the HTML file locally.
-2. Run `npx postplan upload <file path>`.
+2. In this repository, run `pnpm cli upload <file path>`. Outside it, use the published CLI. Upload requires an API key from `POSTPLAN_API_KEY` or saved CLI credentials; stop and request authentication when it is missing. The default server is `https://postplan.martinvana.com`. Never print the key, include it in the HTML, or commit it. Environment variables are inherited by the CLI; `.env` files are not loaded automatically.
 3. Report the local path and returned Postplan URL.
 
 Re-upload the same absolute path to update the existing URL. Use
-`npx postplan upload <file path> --new` only when a new draft is wanted.
+`pnpm cli upload <file path> --new` only when a new draft is wanted.
 
 If validation fails, fix the markup and retry. If a scripted upload needs
 authentication, ask the user to run `postplan auth login`, then retry without

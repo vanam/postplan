@@ -1,0 +1,14 @@
+{
+  "name": "@postplan/html-policy",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": "./index.js",
+  "dependencies": {
+    "parse5": "^8.0.1"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

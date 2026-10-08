@@ -4,18 +4,28 @@
   "description": "Static HTML draft publishing for agents.",
   "type": "module",
   "license": "MIT",
-  "files": ["bin/", "src/", "skills/", "README.md"],
+  "files": [
+    "dist/",
+    "skills/",
+    "README.md"
+  ],
   "bin": {
-    "postplan": "./bin/postplan.js"
+    "postplan": "./dist/postplan.js"
   },
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "build": "esbuild bin/postplan.js --bundle --platform=node --format=esm --external:commander --external:parse5 --outfile=dist/postplan.js",
+    "prepack": "pnpm run build"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "commander": "^14.0.0",
-    "parse5": "^7.3.0"
+    "parse5": "^8.0.1"
+  },
+  "devDependencies": {
+    "@postplan/html-policy": "workspace:*",
+    "esbuild": "^0.28.1"
   }
 }
