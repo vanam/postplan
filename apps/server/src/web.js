@@ -25,6 +25,11 @@ import {
 } from "./render-web.js";
 
 export function registerWebRoutes(app) {
+  // Gate all browser routes, including existing sessions, before their handlers.
+  for (const path of ["/auth/*", "/dashboard", "/dashboard/*", "/settings/api-keys", "/settings/api-keys/*", "/cli/auth"]) {
+    app.use(path, (c, next) => getConfig(c.env).webAuthEnabled ? next() : c.notFound());
+  }
+
   app.get("/auth/sign-in", requireConfigured, async (c) => {
     const config = getConfig(c.env);
     const { verifier, challenge, state } = await buildPkce();

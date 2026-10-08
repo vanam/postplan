@@ -3,7 +3,7 @@
 Upload static HTML drafts to a Postplan server:
 
 ```sh
-npx @vanam/postplan auth login --api-url https://plans.example.com
+npx @vanam/postplan auth set <api-key> --api-url https://plans.example.com
 npx @vanam/postplan upload ./plan.html --api-url https://plans.example.com
 npx @vanam/postplan list --api-url https://plans.example.com
 ```
@@ -11,6 +11,8 @@ npx @vanam/postplan list --api-url https://plans.example.com
 This repository's CLI defaults to `https://postplan.martinvana.com`. Use `--api-url` or `POSTPLAN_API_URL` to override it. Uploads require a valid API key. Credentials and draft mappings are stored in `~/.postplan`. Uploading the same file again updates its draft; `--new` creates a separate draft. `npx postplan` selects the upstream package; use `npx @vanam/postplan` for this fork after its first publication. You can also install it with `npm install --global @vanam/postplan` and run `postplan` directly.
 
 Run `pnpm cli --help` for all commands from this repository. The Worker supports folders, path-based slugs, authenticated readiness checks, unchanged uploads, and classic inline scripts in a sandbox.
+
+Browser sign-in is disabled by default on this server. Use the bootstrap key or another key created through the API. `auth login` requires the server to opt in to browser sign-in with `POSTPLAN_WEB_AUTH_ENABLED=true`.
 
 ```sh
 pnpm cli check ./site --slug warehouse-plan

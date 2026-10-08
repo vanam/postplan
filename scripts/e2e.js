@@ -4,6 +4,7 @@ import test from "node:test";
 
 const base = (process.env.POSTPLAN_API_URL || "https://postplan.martinvana.com").replace(/\/+$/, "");
 const apiKey = process.env.POSTPLAN_API_KEY;
+const webAuthEnabled = process.env.POSTPLAN_WEB_AUTH_ENABLED?.trim().toLowerCase() === "true";
 assert.ok(apiKey, "Set POSTPLAN_API_KEY in .env or your shell before running pnpm test:e2e.");
 
 async function request(path, { method = "GET", body, authenticated = true, key = apiKey, status = 200 } = {}) {
@@ -25,9 +26,28 @@ test(`public and web endpoints against ${base}`, async () => {
   const anonymous = { authenticated: false };
   const home = await request("/", anonymous);
   assert.match(home.headers.get("content-type"), /text\/html/);
-  assert.match(await home.text(), /Postplan/i);
+  const homeHtml = await home.text();
+  assert.match(homeHtml, /Postplan/i);
+  assert.equal(homeHtml.includes('href="/dashboard"'), webAuthEnabled);
   assert.equal((await (await request("/healthz", anonymous)).json()).ok, true);
   assert.ok((await (await request("/favicon.ico", anonymous)).arrayBuffer()).byteLength);
+
+  if (!webAuthEnabled) {
+    for (const [method, path] of [
+      ["GET", "/auth/sign-in"],
+      ["GET", "/auth/callback"],
+      ["POST", "/auth/sign-out"],
+      ["GET", "/dashboard"],
+      ["GET", "/dashboard/drafts/e2e-missing"],
+      ["GET", "/settings/api-keys"],
+      ["POST", "/settings/api-keys"],
+      ["POST", "/settings/api-keys/e2e-missing/revoke"],
+      ["GET", "/cli/auth"]
+    ]) {
+      await request(path, { ...anonymous, method, status: 404 });
+    }
+    return;
+  }
 
   // Check the session guards without logging in or changing browser-owned keys.
   for (const [method, path] of [

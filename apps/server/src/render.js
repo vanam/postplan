@@ -1,4 +1,4 @@
-export function renderHome({ publicBaseUrl }) {
+export function renderHome({ publicBaseUrl, webAuthEnabled }) {
   return htmlPage({
     title: "Postplan",
     body: `
@@ -6,7 +6,7 @@ export function renderHome({ publicBaseUrl }) {
         <h1>Postplan</h1>
         <p>A Cloudflare Worker for publishing static HTML drafts.</p>
         <pre>POST /api/uploads</pre>
-        <p><a href="/dashboard">My drafts</a> · <a href="/settings/api-keys">API keys</a></p>
+        ${webAuthEnabled ? '<p><a href="/dashboard">My drafts</a> · <a href="/settings/api-keys">API keys</a></p>' : ""}
         <p>Health: <a href="/healthz">/healthz</a></p>
         <p>Public base URL: ${escapeHtml(publicBaseUrl || "not configured")}</p>
       </main>

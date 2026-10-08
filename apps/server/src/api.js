@@ -28,6 +28,7 @@ export function createApp() {
     const config = getConfig(c.env);
     return c.html(
       renderHome({
+        webAuthEnabled: config.webAuthEnabled && Boolean(config.sessionSecret && config.publicBaseUrl),
         publicBaseUrl: getHomeUrl({
           publicBaseUrl: config.publicBaseUrl,
           requestBaseUrl: getRequestBaseUrl(c.req.raw)

@@ -1,3 +1,5 @@
 POSTPLAN_BOOTSTRAP_API_KEY=replace-with-a-long-random-token
 POSTPLAN_PUBLIC_BASE_URL=http://localhost:8787
-POSTPLAN_SESSION_SECRET=replace-with-at-least-32-random-bytes
+POSTPLAN_WEB_AUTH_ENABLED=false
+# Optional: enable browser sign-in above and set a session secret.
+# POSTPLAN_SESSION_SECRET=replace-with-at-least-32-random-bytes

@@ -3,11 +3,48 @@ import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetShooCaches } from "../src/shoo.js";
 import { consumeRateLimit, deleteExpiredRateLimits } from "../src/rate-limit.js";
+import { createApp } from "../src/api.js";
+import { createSessionCookie } from "../src/web-auth.js";
 
 const HTML = "<!doctype html><html><head><title>First draft</title></head><body>exact bytes</body></html>";
 
 describe("Postplan Worker", () => {
   afterEach(() => vi.unstubAllGlobals());
+
+  it.each([undefined, "false"])("disables browser routes but keeps API-key publishing available (%j)", async (setting) => {
+    const app = createApp();
+    const bindings = { ...env, POSTPLAN_WEB_AUTH_ENABLED: setting };
+    const cookie = (await createSessionCookie({ accountId: "acct_bootstrap", accountName: "Bootstrap" },
+      bindings.POSTPLAN_SESSION_SECRET)).split(";")[0];
+    const headers = { Cookie: cookie, Authorization: "Bearer test-bootstrap-key" };
+    for (const [method, path] of [
+      ["GET", "/auth/sign-in"], ["GET", "/auth/callback"], ["POST", "/auth/sign-out"],
+      ["GET", "/dashboard"], ["GET", "/dashboard/drafts/example"],
+      ["GET", "/settings/api-keys"], ["POST", "/settings/api-keys"],
+      ["POST", "/settings/api-keys/example/revoke"], ["GET", "/cli/auth"]
+    ]) {
+      const response = await app.request(`https://postplan.test${path}`, { method, headers }, bindings);
+      expect(response.status, `${method} ${path}`).toBe(404);
+      expect(response.headers.get("location")).toBeNull();
+      expect(response.headers.get("set-cookie")).toBeNull();
+    }
+    const home = await app.request("https://postplan.test/", {}, bindings);
+    const html = await home.text();
+    expect(html).not.toContain('href="/dashboard"');
+    expect(html).not.toContain('href="/settings/api-keys"');
+    const key = await app.request("https://postplan.test/api/api-keys", {
+      method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: "{}"
+    }, bindings);
+    expect(key.status).toBe(201);
+    const { token } = await key.json();
+    const uploaded = await app.request("https://postplan.test/api/uploads", {
+      method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ html: HTML })
+    }, bindings);
+    expect(uploaded.status).toBe(201);
+    const { publicUrl } = await uploaded.json();
+    expect(await (await app.request(publicUrl, {}, bindings)).text()).toBe(HTML);
+  });
 
   it("reports D1 health and serves the home page", async () => {
     const health = await SELF.fetch("https://postplan.test/healthz");

@@ -15,6 +15,7 @@ export default defineConfig({
           POSTPLAN_BOOTSTRAP_API_KEY: "test-bootstrap-key",
           POSTPLAN_PUBLIC_BASE_URL: "https://postplan.test",
           POSTPLAN_SESSION_SECRET: "test-session-secret-with-at-least-32-bytes",
+          POSTPLAN_WEB_AUTH_ENABLED: "true",
           SHOO_BASE_URL: "https://shoo.test"
         }
       }

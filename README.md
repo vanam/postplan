@@ -36,7 +36,7 @@ Postplan is a Cloudflare Worker for publishing HTML drafts. This pnpm monorepo c
 5. Set these Worker secrets once in **Workers & Pages > postplan > Settings > Variables and Secrets**:
 
    - `POSTPLAN_BOOTSTRAP_API_KEY` establishes the first administrative API key.
-   - `POSTPLAN_SESSION_SECRET` signs browser sessions and must contain at least 32 random bytes.
+   - Browser sign-in is disabled by default. Only if you enable it, set `POSTPLAN_SESSION_SECRET` to at least 32 random bytes.
 
    You can also generate the production config locally and use Wrangler:
 
@@ -46,7 +46,6 @@ Postplan is a Cloudflare Worker for publishing HTML drafts. This pnpm monorepo c
    pnpm run config:generate production
 
    pnpm --filter @postplan/server exec wrangler secret put POSTPLAN_BOOTSTRAP_API_KEY --config wrangler.production.jsonc
-   pnpm --filter @postplan/server exec wrangler secret put POSTPLAN_SESSION_SECRET --config wrangler.production.jsonc
    ```
 
 6. Check the deployment:
@@ -103,17 +102,13 @@ npx postplan upload ./plan.html \
   --api-url https://plans.example.com
 ```
 
-Uploads require a valid API key and belong to its account. Sign in before uploading:
+Uploads require a valid API key and belong to its account. Save a key before uploading:
 
 ```sh
-npx postplan auth login --api-url https://plans.example.com
+pnpm cli auth set <api-key> --api-url https://plans.example.com
 ```
 
-The command prints the Worker's API-key page URL. Generate a key there, then paste it into the terminal prompt. You can also save an existing key directly:
-
-```sh
-npx postplan auth set <api-key> --api-url https://plans.example.com
-```
+Use the bootstrap key or a key created through the API. If the server explicitly enables browser sign-in, `pnpm cli auth login --api-url https://plans.example.com` opens the web key-generation workflow instead.
 
 Once authenticated, list your drafts with:
 
@@ -181,13 +176,14 @@ The CLI can check markup locally without credentials or when the server is unrea
 Set these secrets with `wrangler secret put` in production:
 
 - `POSTPLAN_BOOTSTRAP_API_KEY` enables the initial administrative account. The Worker creates or updates its D1 row when the key is first used.
-- `POSTPLAN_SESSION_SECRET` signs browser sessions and OAuth state. If it is absent, browser authentication routes return `503`; uploads and draft serving continue to work.
+- `POSTPLAN_SESSION_SECRET` signs browser sessions and OAuth state when browser sign-in is enabled. It is optional in the default API-key-only mode. If browser sign-in is enabled without this secret, its configured routes return `503`.
 
 The generated production configuration sets `POSTPLAN_PUBLIC_BASE_URL` to `https://<POSTPLAN_DOMAIN_PRODUCTION>`. For local development, set it in `apps/server/.dev.vars`.
 
 You can set these optional ordinary variables in the shared `vars` section of `apps/server/wrangler.jsonc`; the generator preserves them:
 
-- `SHOO_BASE_URL` defaults to `https://shoo.dev`.
+- `POSTPLAN_WEB_AUTH_ENABLED` defaults to `false`. Set it to `true` to enable browser sign-in, dashboard, and web API-key settings.
+- `SHOO_BASE_URL` defaults to `https://shoo.dev` and is used only when browser sign-in is enabled.
 - `MAX_HTML_BYTES` defaults to `524288` across all pages in one upload.
 - `MAX_UPLOAD_PAGES` defaults to `20`.
 - `UPLOAD_BODY_LIMIT` defaults to `2mb`.
@@ -210,7 +206,6 @@ pnpm run config:generate production
 pnpm run db:migrate:remote
 pnpm run deploy
 pnpm --filter @postplan/server exec wrangler secret put POSTPLAN_BOOTSTRAP_API_KEY --config wrangler.production.jsonc
-pnpm --filter @postplan/server exec wrangler secret put POSTPLAN_SESSION_SECRET --config wrangler.production.jsonc
 ```
 
 Check the deployment:
@@ -228,6 +223,10 @@ jq -n --rawfile html ./plan.html \
 The daily scheduled handler removes expired rate-limit rows. It does not delete drafts or HTML objects.
 
 ## Browser sign-in
+
+Browser sign-in is disabled by default. All `/auth/*`, dashboard, web API-key settings, and `/cli/auth` routes return `404`, even with an existing session. The home page hides links to the dashboard and key settings. API-key authentication, key creation/revocation through `/api/api-keys`, and publishing remain available. Use the bootstrap key to create additional keys through the API.
+
+To opt in, add `"vars": { "POSTPLAN_WEB_AUTH_ENABLED": "true" }` to `apps/server/wrangler.jsonc` (merge into existing `vars` if present), and set `POSTPLAN_SESSION_SECRET` with Wrangler. The deployment generator preserves this setting. For local development, set the flag and secret in `apps/server/.dev.vars`. A public base URL is also required.
 
 `/dashboard` lists a signed-in account's drafts and `/settings/api-keys` manages its API keys. Sign-in uses [shoo](https://github.com/pingdotgg/shoo) with PKCE and an ES256 ID token. Postplan stores the stable `pairwise_sub` identity plus profile fields approved by the user, then issues its own 30-day HMAC-signed session cookie.
 
@@ -273,7 +272,7 @@ For an opt-in end-to-end test against production, copy `.env.example` to `.env`,
 pnpm test:e2e
 ```
 
-The test defaults to `https://postplan.martinvana.com`; `POSTPLAN_API_URL` can override it. Node loads the gitignored `.env` on both PowerShell and Bash; existing shell variables take precedence. Missing credentials fail before any requests. The smoke test exercises every registered HTTP route: public pages, account info, key creation/revocation, checking, folder publishing, listing, slug redirects, current/raw/historical pages, disabling, and deletion. Web routes check anonymous sign-in guards, OAuth initiation, invalid callback rejection, and sign-out; they do not complete an OAuth login or verify signed-in dashboard/settings behavior.
+The test defaults to `https://postplan.martinvana.com`; `POSTPLAN_API_URL` can override it. Node loads the gitignored `.env` on both PowerShell and Bash; existing shell variables take precedence. Missing credentials fail before any requests. The smoke test exercises every registered HTTP route: public pages, account info, key creation/revocation, checking, folder publishing, listing, slug redirects, current/raw/historical pages, disabling, and deletion. It expects web routes to return `404` by default. Set `POSTPLAN_WEB_AUTH_ENABLED=true` in the test's `.env` only when the target Worker enables browser sign-in; it then checks anonymous sign-in guards, OAuth initiation, invalid callback rejection, and sign-out. It does not complete an OAuth login or verify signed-in dashboard/settings behavior. The test's `.env` controls expectations, not Worker configuration.
 
 It creates one draft and one API key, deletes/revokes only those resources in `finally`, and verifies the draft returns 404. Deletion is soft: audit records and stored HTML remain. This test is separate from `pnpm test` and does not run automatically during deployment.
 

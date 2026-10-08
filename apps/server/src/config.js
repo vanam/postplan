@@ -14,6 +14,7 @@ export function getConfig(env = {}) {
     maxPages: Math.max(1, Math.floor(positiveNumber(env.MAX_UPLOAD_PAGES, 20))),
     uploadBodyBytes: parseByteLimit(env.UPLOAD_BODY_LIMIT, DEFAULT_UPLOAD_BODY_BYTES),
     sessionSecret: cleanString(env.POSTPLAN_SESSION_SECRET),
+    webAuthEnabled: String(env.POSTPLAN_WEB_AUTH_ENABLED).trim().toLowerCase() === "true",
     shooBaseUrl: normalizeBaseUrl(env.SHOO_BASE_URL || "https://shoo.dev"),
     uploadIpRateLimit: {
       windowMs: positiveNumber(env.UPLOAD_IP_RATE_LIMIT_WINDOW_MS, 60_000),
