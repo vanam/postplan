@@ -14,6 +14,7 @@
     "db:migrate:remote": "pnpm --filter @postplan/server db:migrate:remote",
     "test": "pnpm -r test",
     "test:integration": "node scripts/verify-local.js",
+    "test:e2e": "node --env-file-if-exists=.env --test scripts/e2e.js",
     "pack:cli": "pnpm --filter ./packages/cli build && pnpm --filter ./packages/cli pack --out postplan-cli.tgz",
     "check:bundle": "pnpm --filter @postplan/server check:bundle"
   },

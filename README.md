@@ -267,6 +267,16 @@ The canonical and `/raw` forms return the same HTML bytes. Responses include `X-
 
 ## Verification
 
+For an opt-in end-to-end test against production, copy `.env.example` to `.env`, set `POSTPLAN_API_KEY` (preferably for a dedicated test account), and run:
+
+```sh
+pnpm test:e2e
+```
+
+The test defaults to `https://postplan.martinvana.com`; `POSTPLAN_API_URL` can override it. Node loads the gitignored `.env` on both PowerShell and Bash; existing shell variables take precedence. Missing credentials fail before any requests. The smoke test exercises every registered HTTP route: public pages, account info, key creation/revocation, checking, folder publishing, listing, slug redirects, current/raw/historical pages, disabling, and deletion. Web routes check anonymous sign-in guards, OAuth initiation, invalid callback rejection, and sign-out; they do not complete an OAuth login or verify signed-in dashboard/settings behavior.
+
+It creates one draft and one API key, deletes/revokes only those resources in `finally`, and verifies the draft returns 404. Deletion is soft: audit records and stored HTML remain. This test is separate from `pnpm test` and does not run automatically during deployment.
+
 ```sh
 pnpm test
 pnpm test:integration

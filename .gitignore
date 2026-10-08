@@ -1,6 +1,7 @@
 node_modules/
 .wrangler/
 .dev.vars
+.env
 wrangler.*.jsonc
 npm-debug.log*
 postplan-cli.tgz
