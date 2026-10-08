@@ -3,12 +3,12 @@
 Upload static HTML drafts to a Postplan server:
 
 ```sh
-npx postplan upload ./plan.html --api-url https://plans.example.com
 npx postplan auth login --api-url https://plans.example.com
+npx postplan upload ./plan.html --api-url https://plans.example.com
 npx postplan list --api-url https://plans.example.com
 ```
 
-This repository's CLI defaults to `https://postplan.martinvana.com`. Use `--api-url` or `POSTPLAN_API_URL` to override it. Credentials and draft mappings are stored in `~/.postplan`. Uploading the same file again updates its draft; `--new` creates a separate draft. Until this copy is published, `npx postplan` runs the upstream npm release, so pass `--api-url https://postplan.martinvana.com` when using it.
+This repository's CLI defaults to `https://postplan.martinvana.com`. Use `--api-url` or `POSTPLAN_API_URL` to override it. Uploads require a valid API key. Credentials and draft mappings are stored in `~/.postplan`. Uploading the same file again updates its draft; `--new` creates a separate draft. Until this copy is published, `npx postplan` runs the upstream npm release, so pass `--api-url https://postplan.martinvana.com` when using it.
 
 Run `npx postplan --help` for all commands. Folder uploads, custom slugs, and online readiness checks require server support; this repository's Cloudflare Worker currently supports single-file uploads, authentication, and listing drafts.
 
@@ -18,6 +18,7 @@ From the repository root, install with `pnpm install` and run:
 
 ```sh
 pnpm cli --help
+pnpm cli auth set <api-key> --api-url http://localhost:8787
 pnpm cli upload ./plan.html --api-url http://localhost:8787
 pnpm --filter postplan test
 ```

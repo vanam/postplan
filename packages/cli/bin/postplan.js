@@ -113,7 +113,7 @@ program
         "--new cannot be combined with --draft or --slug: those name an existing draft. Use an unused slug to create a new draft at a custom URL."
       );
     }
-    const { apiUrl, apiKey } = readAuth(options.apiUrl, { requireApiKey: false });
+    const { apiUrl, apiKey } = readAuth(options.apiUrl);
     const source = readUploadSource(target);
     // A slug names the draft by itself, so the saved mapping for this path is
     // only used without one. `--draft <id> --slug <name>` renames a draft.
@@ -506,7 +506,7 @@ function printReceipt(receipt) {
   console.log(`Draft ID: ${receipt.draftId}`);
   console.log(`Version: ${receipt.versionNumber}`);
   if (receipt.pages) console.log(`Pages: ${receipt.pages.map((page) => page.path).join(", ")}`);
-  console.log(`Account: ${receipt.account || "anonymous"}`);
+  if (receipt.account) console.log(`Account: ${receipt.account}`);
   console.log(`Update: ${receipt.updateCommand}`);
   for (const warning of receipt.warnings) {
     console.warn(`Warning: ${warning}`);
@@ -521,7 +521,7 @@ function printCheckReport(report) {
   } else if (report.limits) {
     const account = report.account
       ? `${report.account.name} (key: ${report.account.apiKeyName})`
-      : "none (anonymous upload)";
+      : "none (sign in before uploading)";
     console.log(`Account: ${account}`);
     console.log(`Flags: ${report.flags.length ? report.flags.join(", ") : "none"}`);
     console.log(`Limit: ${formatBytes(report.limits.maxBytes)} per upload, ${report.limits.maxPages} page(s)`);

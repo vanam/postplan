@@ -49,7 +49,7 @@ const ALLOWED_LINK_RELS = new Set([
 
 // Event handler content attributes browsers run (HTML, CSS, pointer, touch,
 // and SVG animation events). Other on* attributes, such as one="x", are inert.
-// A handler missing here still cannot run on an anonymous upload: the
+// A handler missing here still cannot run under a script-free CSP: the
 // script-free CSP sets script-src-attr 'none'.
 const EVENT_HANDLER_ATTRS = new Set(
   `abort afterprint animationcancel animationend animationiteration animationstart

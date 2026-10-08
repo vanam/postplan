@@ -82,15 +82,17 @@ The CLI in `packages/cli` is copied from the published `postplan@0.0.5` package,
 
 ```sh
 pnpm cli --help
+pnpm cli auth set <api-key> --api-url http://localhost:8787
 pnpm cli upload ./plan.html --api-url http://localhost:8787
 ```
 
 The copied client also exposes folder uploads, custom slugs, and online readiness checks. Those features require a newer server API and are not implemented by this Worker. Single-file uploads, authentication, and draft listing work with this server. See [the CLI README](packages/cli/README.md) for packaging and source details.
 
-Upload to a local Worker without signing in:
+Authenticate with the local Worker before uploading:
 
 ```sh
-npx postplan upload ./plan.html --api-url http://localhost:8787
+pnpm cli auth set <api-key> --api-url http://localhost:8787
+pnpm cli upload ./plan.html --api-url http://localhost:8787
 ```
 
 This repository's CLI defaults to `https://postplan.martinvana.com`. For another deployed Worker, pass its exact base URL. Until this copy is published, `npx postplan` runs the upstream npm release; pass `--api-url https://postplan.martinvana.com` to target this server.
@@ -101,7 +103,7 @@ npx postplan upload ./plan.html \
   --api-url https://plans.example.com
 ```
 
-Anonymous uploads work, but they do not appear in your dashboard. Sign in before uploading drafts that should belong to your account:
+Uploads require a valid API key and belong to its account. Sign in before uploading:
 
 ```sh
 npx postplan auth login --api-url https://plans.example.com
@@ -123,17 +125,18 @@ Uploading the same local file again creates a new version of its existing draft.
 
 ## HTTP API
 
-Upload a draft by sending its HTML as JSON. Authentication is optional for uploads:
+Upload a draft by sending its HTML as JSON with a valid API key:
 
 ```sh
 jq -n --rawfile html ./plan.html \
   '{html: $html, filename: "plan.html"}' \
   | curl --fail-with-body http://localhost:8787/api/uploads \
       --header 'Content-Type: application/json' \
+      --header 'Authorization: Bearer <api-key>' \
       --data-binary @-
 ```
 
-Add `Authorization: Bearer <api-key>` to associate an upload with an account. Supply the returned `draftId` in a later upload to create a new version of the same draft:
+Requests with a missing, invalid, or revoked API key return `401`. Supply the returned `draftId` in a later upload to create a new version of the same draft:
 
 ```json
 {
@@ -146,6 +149,7 @@ Add `Authorization: Bearer <api-key>` to associate an upload with an account. Su
 
 Authenticated endpoints use the same bearer header:
 
+- `POST /api/uploads`
 - `GET /api/me`
 - `GET /api/drafts`
 - `POST /api/api-keys`
@@ -198,6 +202,7 @@ jq -n --rawfile html ./plan.html \
   '{html: $html, filename: "plan.html"}' \
   | curl --fail-with-body https://plans.example.com/api/uploads \
       --header 'Content-Type: application/json' \
+      --header 'Authorization: Bearer <api-key>' \
       --data-binary @-
 ```
 
@@ -207,7 +212,7 @@ The daily scheduled handler removes expired rate-limit rows. It does not delete 
 
 `/dashboard` lists a signed-in account's drafts and `/settings/api-keys` manages its API keys. Sign-in uses [shoo](https://github.com/pingdotgg/shoo) with PKCE and an ES256 ID token. Postplan stores the stable `pairwise_sub` identity plus profile fields approved by the user, then issues its own 30-day HMAC-signed session cookie.
 
-Uploads made with an API key belong to that key's account. Anonymous uploads belong to the shared public-upload account.
+Uploads belong to the API key's account.
 
 Each draft version records the Cloudflare client IP and `CF-Ray` request ID, client and Git metadata, CI metadata, file size, content hash, inline-script presence, and external image hosts. Client-supplied Git and CI fields are audit data only.
 

@@ -95,20 +95,3 @@ CREATE TABLE rate_limits (
 CREATE INDEX draft_versions_draft_id_idx ON draft_versions(draft_id);
 CREATE INDEX upload_events_draft_id_idx ON upload_events(draft_id);
 CREATE INDEX drafts_account_id_idx ON drafts(account_id);
-
-INSERT INTO accounts (id, name, created_at, updated_at)
-VALUES (
-  'acct_public_upload',
-  'Public Uploads',
-  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-  strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-);
-
-INSERT INTO api_keys (id, account_id, name, key_hash, created_at)
-VALUES (
-  'key_public_upload',
-  'acct_public_upload',
-  'Public Uploads',
-  '284cf204d3658d626f88fb5a587a9b02ee8e17aad15cf5939eb5cb009e394476',
-  strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-);

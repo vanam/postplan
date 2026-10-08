@@ -39,7 +39,7 @@ test("uploads exact HTML and reuses the saved draft unless --new is supplied", a
   const { home, apiUrl, run } = await fixture(t, (request, body) => {
     assert.equal(request.url, "/api/uploads");
     assert.equal(request.method, "POST");
-    assert.equal(request.headers.authorization, undefined);
+    assert.equal(request.headers.authorization, "Bearer test-key");
     uploads.push(body);
     return {
       status: body.draftId ? 200 : 201,
@@ -51,6 +51,7 @@ test("uploads exact HTML and reuses the saved draft unless --new is supplied", a
       }
     };
   });
+  await run("auth", "set", "test-key");
   const html = "<!doctype html><title>Plan</title><h1>Hello</h1>\n";
   await writeFile(path.join(home, "plan.html"), html);
   const first = JSON.parse((await run("upload", "plan.html", "--json")).stdout);
@@ -81,11 +82,24 @@ test("saves credentials and uses them for authenticated draft listing", async (t
   assert.deepEqual(JSON.parse((await run("list", "--json")).stdout), [{ id: "owned-draft", title: "My plan" }]);
 });
 
+test("requires credentials before sending an upload", async (t) => {
+  const { home, run } = await fixture(t, () => {
+    assert.fail("An upload without credentials must not reach the server");
+  });
+  await writeFile(path.join(home, "plan.html"), "<title>Plan</title>");
+  await assert.rejects(run("upload", "plan.html"), (error) => {
+    assert.equal(error.code, 1);
+    assert.match(error.stderr, /Missing API key/);
+    return true;
+  });
+});
+
 test("reports a rejected upload without saving a draft mapping", async (t) => {
   const { home, run } = await fixture(t, () => ({
     status: 400,
     body: { error: "Invalid HTML", errors: ["Forms are not allowed"] }
   }));
+  await run("auth", "set", "test-key");
   await writeFile(path.join(home, "bad.html"), "<form></form>");
   await assert.rejects(run("upload", "bad.html", "--json"), (error) => {
     assert.equal(error.code, 1);

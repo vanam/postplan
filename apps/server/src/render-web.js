@@ -11,7 +11,7 @@ export function renderSignIn({ next }) {
         <h1>Postplan</h1>
         <p class="muted">Sign in to see the drafts you've published.</p>
         <p><a class="button" href="${escapeHtml(target)}">Continue with shoo</a></p>
-        <p class="muted small">Uploads stay anonymous unless the request includes an API key.</p>
+        <p class="muted small">Uploads require an API key.</p>
       </main>
     `
   });

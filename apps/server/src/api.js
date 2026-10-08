@@ -7,8 +7,7 @@ import {
   findApiKeyByToken,
   findOwnedDraft,
   findPublicDraftVersion,
-  isoNow,
-  publicUploadAuth
+  isoNow
 } from "./db.js";
 import { listAccountDrafts } from "./drafts.js";
 import { validateHtml } from "./html-policy.js";
@@ -104,7 +103,7 @@ export function createApp() {
     return c.json({ ok: true });
   });
 
-  app.post("/api/uploads", async (c) => {
+  app.post("/api/uploads", requireAuth, async (c) => {
     const config = getConfig(c.env);
     const ip = clientIp(c.req.raw) || "anonymous";
     const ipLimit = await consumeRateLimit(c.env.DB, {
@@ -114,11 +113,10 @@ export function createApp() {
     });
     if (!ipLimit.allowed) return rateLimitResponse(c, ipLimit.retryAfter);
 
-    const auth = (await optionalAuth(c)) || publicUploadAuth;
-    c.set("auth", auth);
+    const auth = c.get("auth");
     const keyLimit = await consumeRateLimit(c.env.DB, {
       keyPrefix: "upload-key",
-      identity: auth.id || ip,
+      identity: auth.id,
       ...config.uploadKeyRateLimit
     });
     if (!keyLimit.allowed) return rateLimitResponse(c, keyLimit.retryAfter);

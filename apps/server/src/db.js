@@ -1,13 +1,6 @@
 import { sha256 } from "./crypto.js";
 import { newInternalId } from "./ids.js";
 
-export const publicUploadAuth = {
-  id: "key_public_upload",
-  account_id: "acct_public_upload",
-  name: "Public Uploads",
-  account_name: "Public Uploads"
-};
-
 const BOOTSTRAP_ACCOUNT_ID = "acct_bootstrap";
 const BOOTSTRAP_KEY_ID = "key_bootstrap";
 
@@ -20,12 +13,12 @@ export async function findApiKeyByToken(db, token, bootstrapApiKey) {
         FROM api_keys
         JOIN accounts ON accounts.id = api_keys.account_id
         WHERE api_keys.key_hash = ?
-          AND api_keys.id NOT IN (?, ?)
+          AND api_keys.id != ?
           AND api_keys.revoked_at IS NULL
         LIMIT 1
       `
     )
-    .bind(keyHash, publicUploadAuth.id, BOOTSTRAP_KEY_ID)
+    .bind(keyHash, BOOTSTRAP_KEY_ID)
     .first();
 
   if (result) {

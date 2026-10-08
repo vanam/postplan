@@ -43,6 +43,18 @@ describe("Postplan Worker", () => {
     expect(removedAlias.status).toBe(404);
   });
 
+  it.each(["", "Bearer invalid-key"])("requires a valid API key for uploads (%j)", async (authorization) => {
+    const draftsBefore = await env.DB.prepare("SELECT COUNT(*) AS count FROM drafts").first();
+    const objectsBefore = await env.DRAFTS.list();
+    const upload = await uploadDraft({ html: HTML, filename: "private.html" }, {
+      Authorization: authorization
+    });
+    expect(upload.response.status).toBe(401);
+    expect(upload.body).toEqual({ ok: false, error: "Missing or invalid API key." });
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM drafts").first()).toEqual(draftsBefore);
+    expect((await env.DRAFTS.list()).objects).toEqual(objectsBefore.objects);
+  });
+
   it("allocates unique versions for concurrent updates", async () => {
     const first = await uploadDraft({ html: HTML, filename: "concurrent.html" });
     const updates = await Promise.all(
@@ -100,8 +112,7 @@ describe("Postplan Worker", () => {
 
     const list = await SELF.fetch("https://postplan.test/api/drafts", { headers });
     const listBody = await list.json();
-    expect(listBody.drafts).toHaveLength(1);
-    expect(listBody.drafts[0]).toMatchObject({
+    expect(listBody.drafts.find((draft) => draft.draftId === uploaded.body.draftId)).toMatchObject({
       draftId: uploaded.body.draftId,
       description: "Owned draft",
       latestVersionNumber: 1,
@@ -125,7 +136,7 @@ describe("Postplan Worker", () => {
     });
     expect(deleted.status).toBe(200);
     const afterDelete = await SELF.fetch("https://postplan.test/api/drafts", { headers });
-    expect((await afterDelete.json()).drafts).toHaveLength(0);
+    expect((await afterDelete.json()).drafts.map((draft) => draft.draftId)).not.toContain(uploaded.body.draftId);
   });
 
   it("rejects invalid HTML and malformed JSON", async () => {
@@ -138,7 +149,7 @@ describe("Postplan Worker", () => {
 
     const invalidJson = await SELF.fetch("https://postplan.test/api/uploads", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: "Bearer test-bootstrap-key" },
       body: "{"
     });
     expect(invalidJson.status).toBe(400);
@@ -173,7 +184,8 @@ describe("Postplan Worker", () => {
       env.DB.prepare("DELETE FROM upload_events"),
       env.DB.prepare("DELETE FROM draft_versions"),
       env.DB.prepare("DELETE FROM drafts"),
-      env.DB.prepare("DELETE FROM api_keys WHERE id = 'key_public_upload'")
+      env.DB.prepare(`CREATE TRIGGER reject_test_draft BEFORE INSERT ON drafts
+        BEGIN SELECT RAISE(ABORT, 'Test write failure'); END`)
     ]);
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
     const failed = await uploadDraft({ html: HTML, filename: "orphan.html" });
@@ -181,6 +193,7 @@ describe("Postplan Worker", () => {
     expect((await env.DRAFTS.list()).objects).toHaveLength(0);
     expect(await env.DB.prepare("SELECT id FROM drafts").first()).toBeNull();
     expect(errorLog).toHaveBeenCalled();
+    await env.DB.prepare("DROP TRIGGER reject_test_draft").run();
     errorLog.mockRestore();
   });
 
@@ -267,6 +280,7 @@ async function uploadDraft(payload, extraHeaders = {}) {
     headers: {
       "Content-Type": "application/json",
       "CF-Connecting-IP": "203.0.113.20",
+      Authorization: "Bearer test-bootstrap-key",
       ...extraHeaders
     },
     body: JSON.stringify(payload)
